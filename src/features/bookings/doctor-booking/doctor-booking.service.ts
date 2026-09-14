@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { withTimeout } from "@/lib/async";
 
 export interface CreateDoctorBookingInput {
   doctorId: string;
@@ -21,20 +22,18 @@ export interface CreateDoctorBookingInput {
 export async function createDoctorBooking(
   input: CreateDoctorBookingInput
 ) {
-  if (!input.serviceId) {
-    throw new Error("يجب اختيار الخدمة قبل حجز الموعد");
-  }
-
-  const { data, error } = await supabase.rpc("create_booking", {
-    p_provider_id: input.doctorId,
-    p_provider_type: "doctor",
-    p_service_id: input.serviceId,
-    p_date: input.date,
-    p_start: input.startTime,
-    p_end: input.endTime,
-    p_price: input.price,
-    ...(input.notes ? { p_notes: input.notes } : {}),
-  });
+  const { data, error } = await withTimeout(
+    supabase.rpc("create_booking", {
+      p_provider_id: input.doctorId,
+      p_provider_type: "doctor",
+      p_service_id: input.serviceId,
+      p_date: input.date,
+      p_start: input.startTime,
+      p_end: input.endTime,
+      p_price: input.price,
+      ...(input.notes ? { p_notes: input.notes } : {}),
+    })
+  );
 
   if (error) {
     const isSlotConflict =

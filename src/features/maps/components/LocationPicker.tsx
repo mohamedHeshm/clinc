@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useDebounce } from "@/hooks/useDebounce";
 import { MAP_API_KEY, DEFAULT_MAP_CENTER } from "@/lib/map-config";
+import { withTimeout } from "@/lib/async";
 import { searchAddress, reverseGeocode, type GeocodeResult } from "../services/geocoding.service";
 
 export interface PickedLocation {
@@ -60,7 +61,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
   }, [debouncedQuery]);
 
   async function selectCoordinates(latitude: number, longitude: number) {
-    const address = await reverseGeocode(latitude, longitude);
+    const address = await withTimeout(reverseGeocode(latitude, longitude), 10_000);
     onChange({ latitude, longitude, address });
   }
 
@@ -76,8 +77,13 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        await selectCoordinates(position.coords.latitude, position.coords.longitude);
-        setIsLocating(false);
+        try {
+          await selectCoordinates(position.coords.latitude, position.coords.longitude);
+        } catch {
+          toast.error("تعذّر تحديد عنوان هذا الموقع. يمكنك كتابة العنوان يدويًا.");
+        } finally {
+          setIsLocating(false);
+        }
       },
       () => {
         toast.error("تعذّر الوصول لموقعك الحالي. تأكد من تفعيل صلاحية الموقع.");

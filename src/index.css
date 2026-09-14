@@ -40,12 +40,23 @@
 
 html {
   direction: rtl;
+  scroll-behavior: smooth;
 }
 
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  min-width: 320px;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  max-width: 100%;
+}
+
+button, input, textarea, select {
+  font: inherit;
 }
 
 /* حالة focus واضحة لإتاحة التنقل بلوحة المفاتيح (متطلب Accessibility) */

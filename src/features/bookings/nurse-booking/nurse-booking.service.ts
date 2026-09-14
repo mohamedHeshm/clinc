@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { withTimeout } from "@/lib/async";
 import type { PickedLocation } from "@/features/maps/components/LocationPicker";
 
 export interface CreateNurseBookingInput {
@@ -13,13 +14,8 @@ export interface CreateNurseBookingInput {
 }
 
 export async function createNurseBooking(input: CreateNurseBookingInput) {
-  if (!input.serviceId) {
-    throw new Error("يجب اختيار الخدمة قبل حجز الموعد");
-  }
-
-  const { data: booking, error: bookingError } = await supabase.rpc(
-    "create_booking",
-    {
+  const { data: booking, error: bookingError } = await withTimeout(
+    supabase.rpc("create_booking", {
       p_provider_id: input.nurseId,
       p_provider_type: "nurse",
       p_service_id: input.serviceId,
@@ -28,7 +24,7 @@ export async function createNurseBooking(input: CreateNurseBookingInput) {
       p_end: input.endTime,
       p_price: input.price,
       ...(input.notes ? { p_notes: input.notes } : {}),
-    }
+    })
   );
 
   if (bookingError) {
@@ -43,15 +39,15 @@ export async function createNurseBooking(input: CreateNurseBookingInput) {
 
   const bookingId = (booking as { id: string }).id;
 
-  const { error: locationError } = await supabase
-    .from("locations")
-    .insert({
+  const { error: locationError } = await withTimeout(
+    supabase.from("locations").insert({
       booking_id: bookingId,
       latitude: input.location.latitude,
       longitude: input.location.longitude,
       address: input.location.address,
       ...(input.notes ? { notes: input.notes } : {}),
-    });
+    })
+  );
 
   if (locationError) {
     // فشل حفظ الموقع بعد نجاح إنشاء الحجز.

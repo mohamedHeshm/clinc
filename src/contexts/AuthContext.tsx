@@ -8,6 +8,7 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { withTimeout } from "@/lib/async";
 import type { Profile } from "@/types/models";
 
 interface AuthContextValue {
@@ -26,14 +27,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadProfile = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+    const { data, error } = await withTimeout(
+      supabase.from("profiles").select("*").eq("id", userId).single(),
+      10_000
+    );
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error("تعذّر جلب بيانات الملف الشخصي:", error.message);
       setProfile(null);
       return;
@@ -44,14 +43,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!isMounted) return;
-      setSession(data.session);
-      if (data.session) {
-        await loadProfile(data.session.user.id);
+    const initializeAuth = async () => {
+      try {
+        const { data } = await withTimeout(supabase.auth.getSession(), 10_000);
+        if (!isMounted) return;
+        setSession(data.session);
+        if (data.session) await loadProfile(data.session.user.id);
+      } catch (error) {
+        console.error("تعذّر تهيئة جلسة المستخدم:", error);
+        if (isMounted) {
+          setSession(null);
+          setProfile(null);
+        }
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
-      setIsLoading(false);
-    });
+    };
+
+    void initializeAuth();
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession);

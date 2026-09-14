@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import { toast } from "sonner";
 import { MapPin } from "lucide-react";
-import { useDoctor } from "@/features/doctors/hooks/useDoctors";
+import { useDoctor, useDoctorServices } from "@/features/doctors/hooks/useDoctors";
 import { useProviderAvailability } from "@/features/availability/hooks/useProviderAvailability";
 import { useAvailableSlots } from "@/features/availability/hooks/useAvailableSlots";
 import { TimeSlotGrid } from "@/components/shared/TimeSlotGrid";
@@ -16,20 +16,33 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Spinner } from "@/components/feedback/Loading";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { ROUTES } from "@/constants/routes";
+import { cn } from "@/lib/utils";
 
 export function DoctorBookingPage() {
   const { doctorId } = useParams<{ doctorId: string }>();
   const navigate = useNavigate();
 
   const { data: doctor, isLoading, isError, refetch } = useDoctor(doctorId);
-  const { data: availability } = useProviderAvailability(doctorId, "doctor");
+  const { data: services } = useDoctorServices(doctorId);
+  const {
+    data: availability,
+    isLoading: availabilityLoading,
+    isError: availabilityError,
+    refetch: refetchAvailability,
+  } = useProviderAvailability(doctorId, "doctor");
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const dateKey = selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined;
-  const { data: slots, isLoading: slotsLoading, refetch: refetchSlots } = useAvailableSlots(
+  const {
+    data: slots,
+    isLoading: slotsLoading,
+    isError: slotsError,
+    refetch: refetchSlots,
+  } = useAvailableSlots(
     doctorId,
     "doctor",
     dateKey
@@ -40,12 +53,16 @@ export function DoctorBookingPage() {
     [availability]
   );
 
+  const selectedServicePrice = useMemo(
+    () => services?.find((service) => service.service_id === selectedServiceId)?.price ?? doctor?.consultation_price ?? 0,
+    [doctor?.consultation_price, selectedServiceId, services]
+  );
+
   const isDateDisabled = (date: Date) => {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     if (date < startOfToday) return true;
-    if (availableDaysOfWeek.size === 0) return false; // لسه البيانات بتتحمّل
-    return !availableDaysOfWeek.has(date.getDay());
+    return availabilityLoading || !availableDaysOfWeek.has(date.getDay());
   };
 
   const handleSelectDate = (date: Date) => {
@@ -61,11 +78,11 @@ export function DoctorBookingPage() {
     try {
       const booking = await createDoctorBooking({
         doctorId: doctor.id,
-        serviceId: null,
         date: dateKey,
         startTime: selectedSlot.slot_start,
         endTime: selectedSlot.slot_end,
-        price: doctor.consultation_price,
+        serviceId: selectedServiceId,
+        price: selectedServicePrice,
       });
       toast.success("تم إرسال طلب الحجز — بانتظار رد الطبيب");
       navigate(ROUTES.dashboardBookingDetails((booking as { id: string }).id));
@@ -98,7 +115,8 @@ export function DoctorBookingPage() {
   }
 
   return (
-    <div className="container max-w-lg py-10">
+    <div className="container max-w-xl py-6 sm:py-10">
+      <div className="rounded-lg border border-border bg-surface p-4 shadow-soft sm:p-5">
       <div className="flex items-center gap-3">
         <Avatar className="h-12 w-12">
           <AvatarImage src={doctor.avatar_url ?? undefined} alt={doctor.full_name} />
@@ -110,14 +128,55 @@ export function DoctorBookingPage() {
         </div>
       </div>
 
+      {services && services.length > 0 && (
+        <section className="mt-6">
+          <h2 className="text-sm font-semibold text-foreground">نوع الكشف</h2>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setSelectedServiceId(null)}
+              className={cn(
+                "flex min-h-14 items-center justify-between rounded border border-border px-4 py-3 text-right text-sm transition-colors",
+                selectedServiceId === null && "border-primary bg-primary-subtle"
+              )}
+            >
+              <span>كشف عيادة</span>
+              <span className="text-muted-foreground">{doctor.consultation_price} جنيه</span>
+            </button>
+            {services.map((service) => (
+              <button
+                key={service.service_id}
+                type="button"
+                onClick={() => setSelectedServiceId(service.service_id)}
+                className={cn(
+                  "flex min-h-14 items-center justify-between rounded border border-border px-4 py-3 text-right text-sm transition-colors hover:border-primary",
+                  selectedServiceId === service.service_id && "border-primary bg-primary-subtle"
+                )}
+              >
+                <span>{service.name}</span>
+                <span className="text-muted-foreground">{service.price ?? doctor.consultation_price} جنيه</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="mt-6">
         <h2 className="text-sm font-semibold text-foreground">اختر التاريخ</h2>
-        <Calendar
-          className="mt-3"
-          selected={selectedDate}
-          onSelect={handleSelectDate}
-          isDateDisabled={isDateDisabled}
-        />
+        {availabilityLoading ? (
+          <div className="flex justify-center py-8"><Spinner /></div>
+        ) : availabilityError ? (
+          <ErrorState className="py-8" title="تعذّر تحميل مواعيد العمل" onRetry={() => refetchAvailability()} />
+        ) : availableDaysOfWeek.size === 0 ? (
+          <p className="mt-3 rounded border border-border bg-surface-muted p-4 text-sm text-muted-foreground">لا توجد مواعيد عمل متاحة لهذا الطبيب حاليًا.</p>
+        ) : (
+          <Calendar
+            className="mt-3"
+            selected={selectedDate}
+            onSelect={handleSelectDate}
+            isDateDisabled={isDateDisabled}
+          />
+        )}
       </section>
 
       {selectedDate && (
@@ -128,6 +187,8 @@ export function DoctorBookingPage() {
               <div className="flex justify-center py-4">
                 <Spinner />
               </div>
+            ) : slotsError ? (
+              <ErrorState className="py-8" title="تعذّر تحميل الأوقات المتاحة" onRetry={() => refetchSlots()} />
             ) : (
               <TimeSlotGrid slots={slots ?? []} selected={selectedSlot} onSelect={setSelectedSlot} />
             )}
@@ -166,7 +227,7 @@ export function DoctorBookingPage() {
             </div>
             <div className="flex justify-between border-t border-border pt-2 font-medium">
               <span className="text-muted-foreground">السعر</span>
-              <span className="text-foreground">{doctor.consultation_price} جنيه</span>
+              <span className="text-foreground">{selectedServicePrice} جنيه</span>
             </div>
           </div>
 
@@ -185,6 +246,7 @@ export function DoctorBookingPage() {
           العودة لملف الطبيب
         </Link>
       </p>
+      </div>
     </div>
   );
 }

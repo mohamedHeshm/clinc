@@ -39,13 +39,13 @@ export function DashboardLayout() {
           </nav>
         </aside>
 
-        <main className="min-w-0 flex-1 pb-20 md:pb-0">
+        <main className="min-w-0 flex-1 pb-24 md:pb-0">
           <Outlet />
         </main>
       </div>
 
       {/* Bottom Navigation — موبايل فقط */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
@@ -53,7 +53,7 @@ export function DashboardLayout() {
             end={item.end}
             className={({ isActive }) =>
               cn(
-                "flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] text-muted-foreground",
+                "flex min-w-0 flex-1 flex-col items-center gap-1 px-1 py-2.5 text-[10px] text-muted-foreground",
                 isActive && "text-primary"
               )
             }

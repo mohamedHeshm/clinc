@@ -740,7 +740,7 @@ export type Database = {
           p_price: number
           p_provider_id: string
           p_provider_type: Database["public"]["Enums"]["provider_kind"]
-          p_service_id: string
+          p_service_id: string | null
           p_start: string
         }
         Returns: {

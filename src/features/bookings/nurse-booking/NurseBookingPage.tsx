@@ -25,7 +25,12 @@ export function NurseBookingPage() {
 
   const { data: nurse, isLoading, isError, refetch } = useNurse(nurseId);
   const { data: services } = useNurseServices(nurseId);
-  const { data: availability } = useProviderAvailability(nurseId, "nurse");
+  const {
+    data: availability,
+    isLoading: availabilityLoading,
+    isError: availabilityError,
+    refetch: refetchAvailability,
+  } = useProviderAvailability(nurseId, "nurse");
 
   const [selectedServiceId, setSelectedServiceId] = useState<string | null | "default">(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
@@ -35,7 +40,12 @@ export function NurseBookingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const dateKey = selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined;
-  const { data: slots, isLoading: slotsLoading, refetch: refetchSlots } = useAvailableSlots(
+  const {
+    data: slots,
+    isLoading: slotsLoading,
+    isError: slotsError,
+    refetch: refetchSlots,
+  } = useAvailableSlots(
     nurseId,
     "nurse",
     dateKey
@@ -50,8 +60,7 @@ export function NurseBookingPage() {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     if (date < startOfToday) return true;
-    if (availableDaysOfWeek.size === 0) return false;
-    return !availableDaysOfWeek.has(date.getDay());
+    return availabilityLoading || !availableDaysOfWeek.has(date.getDay());
   };
 
   const selectedServicePrice = useMemo(() => {
@@ -164,16 +173,24 @@ export function NurseBookingPage() {
       {selectedServiceId && (
         <section className="mt-6">
           <h2 className="text-sm font-semibold text-foreground">اختر التاريخ</h2>
-          <Calendar
-            className="mt-3"
-            selected={selectedDate}
-            onSelect={(date) => {
-              if (isDateDisabled(date)) return;
-              setSelectedDate(date);
-              setSelectedSlot(null);
-            }}
-            isDateDisabled={isDateDisabled}
-          />
+          {availabilityLoading ? (
+            <div className="flex justify-center py-8"><Spinner /></div>
+          ) : availabilityError ? (
+            <ErrorState className="py-8" title="تعذّر تحميل مواعيد العمل" onRetry={() => refetchAvailability()} />
+          ) : availableDaysOfWeek.size === 0 ? (
+            <p className="mt-3 rounded border border-border bg-surface-muted p-4 text-sm text-muted-foreground">لا توجد مواعيد عمل متاحة للممرض/ة حاليًا.</p>
+          ) : (
+            <Calendar
+              className="mt-3"
+              selected={selectedDate}
+              onSelect={(date) => {
+                if (isDateDisabled(date)) return;
+                setSelectedDate(date);
+                setSelectedSlot(null);
+              }}
+              isDateDisabled={isDateDisabled}
+            />
+          )}
         </section>
       )}
 
@@ -185,6 +202,8 @@ export function NurseBookingPage() {
               <div className="flex justify-center py-4">
                 <Spinner />
               </div>
+            ) : slotsError ? (
+              <ErrorState className="py-8" title="تعذّر تحميل الأوقات المتاحة" onRetry={() => refetchSlots()} />
             ) : (
               <TimeSlotGrid slots={slots ?? []} selected={selectedSlot} onSelect={setSelectedSlot} />
             )}
