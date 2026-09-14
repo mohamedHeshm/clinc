@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────
+   Clinic Design Tokens
+   قيم HSL مشتقة من لوحة الألوان المعتمدة في المرحلة 6.
+   ───────────────────────────────────────────── */
+:root {
+  --background: 60 20% 98%; /* #FBFBF8 أبيض-عاجي هادئ */
+  --foreground: 160 10% 12%; /* #1B211F نص أساسي دافئ قريب من الأسود */
+
+  --surface: 0 0% 100%;
+  --surface-muted: 140 8% 95%;
+
+  --border: 130 10% 89%;
+
+  --primary: 190 47% 23%; /* #1F4C56 تيل-أزرق طبي عميق */
+  --primary-hover: 190 49% 17%;
+  --primary-foreground: 0 0% 100%;
+  --primary-subtle: 190 20% 94%;
+
+  --accent: 140 21% 39%; /* #4F7A5D أخضر طبي محدود الاستخدام */
+  --accent-subtle: 140 20% 94%;
+
+  --muted: 140 8% 95%;
+  --muted-foreground: 150 8% 40%;
+
+  --destructive: 4 48% 44%;
+  --destructive-foreground: 0 0% 100%;
+
+  --warning: 37 50% 48%;
+
+  --ring: 190 47% 40%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  direction: rtl;
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* حالة focus واضحة لإتاحة التنقل بلوحة المفاتيح (متطلب Accessibility) */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
