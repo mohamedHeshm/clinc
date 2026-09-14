@@ -4,9 +4,9 @@ dist-ssr
 *.local
 *.tsbuildinfo
 
-.env.example
-.env.example.local
-.env.example.*.local
+.env
+.env.local
+.env.*.local
 
 .DS_Store
 *.log
