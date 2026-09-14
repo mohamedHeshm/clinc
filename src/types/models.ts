@@ -23,6 +23,8 @@ export interface Profile {
   phone: string;
   gender: Gender | null;
   address: string | null;
+  latitude: number | null;
+  longitude: number | null;
   avatar_url: string | null;
   role: UserRole;
   status: AccountStatus;

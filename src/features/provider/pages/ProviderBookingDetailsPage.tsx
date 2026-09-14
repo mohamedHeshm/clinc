@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { Phone, MapPin, Calendar as CalendarIcon, Clock, FileText } from "lucide-react";
+import { Phone, MapPin, Calendar as CalendarIcon, Clock, FileText, Navigation } from "lucide-react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import { useProviderBooking, useUpdateBookingStatus } from "../hooks/useProviderBookings";
@@ -26,6 +26,9 @@ import {
   CANCELLABLE_BOOKING_STATUSES,
 } from "@/constants/booking-status";
 import type { BookingStatus } from "@/types/enums";
+import { useMyProvider } from "../hooks/useMyProvider";
+import { MedicalMap, type MapPoint } from "@/features/maps/components/MedicalMap";
+import { distanceInKm, formatDistance } from "@/utils/distance";
 
 const NEXT_ACTIONS: Partial<Record<BookingStatus, { label: string; next: BookingStatus }[]>> = {
   pending: [
@@ -40,6 +43,7 @@ const NEXT_ACTIONS: Partial<Record<BookingStatus, { label: string; next: Booking
 export function ProviderBookingDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const { data: booking, isLoading, isError, refetch } = useProviderBooking(id);
+  const { data: provider } = useMyProvider();
   const updateStatus = useUpdateBookingStatus();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
@@ -56,6 +60,17 @@ export function ProviderBookingDetailsPage() {
   const actions = NEXT_ACTIONS[booking.status] ?? [];
   const canCancel = CANCELLABLE_BOOKING_STATUSES.includes(booking.status);
   const isPending = booking.status === "pending";
+  const canShareLocation = booking.status === "confirmed" || booking.status === "in_progress" || booking.status === "completed";
+  const providerLocation = provider?.doctor?.clinic_latitude != null && provider.doctor.clinic_longitude != null
+    ? { latitude: provider.doctor.clinic_latitude, longitude: provider.doctor.clinic_longitude }
+    : provider?.nurse?.base_latitude != null && provider.nurse.base_longitude != null
+      ? { latitude: provider.nurse.base_latitude, longitude: provider.nurse.base_longitude }
+      : null;
+  const mapPoints: MapPoint[] = [
+    ...(booking.patient_location ? [{ ...booking.patient_location, label: "موقع المريض", tone: "patient" as const }] : []),
+    ...(providerLocation ? [{ ...providerLocation, label: "موقعك", tone: provider?.type === "doctor" ? "doctor" as const : "nurse" as const }] : []),
+  ];
+  const distance = booking.patient_location && providerLocation ? formatDistance(distanceInKm(booking.patient_location, providerLocation)) : null;
 
   return (
     <div className="max-w-xl">
@@ -65,6 +80,15 @@ export function ProviderBookingDetailsPage() {
           {BOOKING_STATUS_LABELS[booking.status]}
         </Badge>
       </div>
+
+      {canShareLocation && mapPoints.length > 0 && (
+        <section className="mt-4 rounded-xl border border-border bg-surface p-4 shadow-soft">
+          <h2 className="font-semibold text-foreground">خريطة الزيارة</h2>
+          <p className="mt-1 text-xs text-muted-foreground">{distance ? `المسافة التقريبية: ${distance}` : "بيانات الموقع غير مكتملة."}</p>
+          <div className="mt-3"><MedicalMap points={mapPoints} readonly height="15rem" /></div>
+          {booking.patient_location && providerLocation && <Button className="mt-3 w-full" variant="outline" asChild><a href={`https://www.google.com/maps/dir/?api=1&origin=${providerLocation.latitude},${providerLocation.longitude}&destination=${booking.patient_location.latitude},${booking.patient_location.longitude}`} target="_blank" rel="noreferrer"><Navigation className="h-4 w-4" />فتح الطريق</a></Button>}
+        </section>
+      )}
       <p className="mt-1 text-sm text-muted-foreground">{BOOKING_STATUS_DESCRIPTIONS[booking.status]}</p>
 
       <div className="mt-5 space-y-3 rounded-lg border border-border p-5 text-sm">

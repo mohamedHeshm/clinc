@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateProfile, uploadAvatar } from "../services/profile.service";
+import { LocationPicker, type PickedLocation } from "@/features/maps/components/LocationPicker";
 
 const profileSchema = z.object({
   fullName: z.string().trim().min(3, "الاسم يجب أن يكون 3 أحرف على الأقل"),
@@ -26,10 +27,16 @@ export function ProfilePage() {
   const { profile, refreshProfile } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [location, setLocation] = useState<PickedLocation | null>(
+    profile?.latitude != null && profile.longitude != null
+      ? { latitude: profile.latitude, longitude: profile.longitude, address: profile.address ?? "" }
+      : null
+  );
 
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -48,6 +55,8 @@ export function ProfilePage() {
         full_name: values.fullName,
         phone: values.phone,
         address: values.address || null,
+        latitude: location?.latitude ?? null,
+        longitude: location?.longitude ?? null,
       });
       await refreshProfile();
       toast.success("تم حفظ التعديلات");
@@ -123,6 +132,18 @@ export function ProfilePage() {
           <Label htmlFor="fullName">الاسم الكامل</Label>
           <Input id="fullName" {...register("fullName")} />
           {errors.fullName && <p className="text-xs text-destructive">{errors.fullName.message}</p>}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>موقعك</Label>
+          <LocationPicker
+            value={location}
+            onChange={(nextLocation) => {
+              setLocation(nextLocation);
+              setValue("address", nextLocation.address);
+            }}
+          />
+          <p className="text-xs text-muted-foreground">نشارك موقعك مع مقدم الخدمة المرتبط بالحجز المؤكد فقط.</p>
         </div>
 
         <div className="space-y-1.5">

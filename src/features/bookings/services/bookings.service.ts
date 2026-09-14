@@ -8,6 +8,7 @@ export interface EnrichedBooking extends Booking {
   provider_subtitle: string; // تخصص الطبيب أو "ممرض/ة"
   service_name: string | null;
   location: BookingLocation | null;
+  provider_location: { latitude: number; longitude: number } | null;
 }
 
 export async function fetchMyBookings(patientId: string, statusFilter?: readonly BookingStatus[]) {
@@ -49,10 +50,10 @@ async function enrichBookings(bookings: Booking[]): Promise<EnrichedBooking[]> {
 
   const [doctorsRes, nursesRes, servicesRes, locationsRes] = await Promise.all([
     doctorIds.length
-      ? supabase.from("doctors_public").select("id, full_name, avatar_url, specialization").in("id", doctorIds)
+      ? supabase.from("doctors_public").select("id, full_name, avatar_url, specialization, clinic_latitude, clinic_longitude").in("id", doctorIds)
       : Promise.resolve({ data: [], error: null }),
     nurseIds.length
-      ? supabase.from("nurses_public").select("id, full_name, avatar_url").in("id", nurseIds)
+      ? supabase.from("nurses_public").select("id, full_name, avatar_url, base_latitude, base_longitude").in("id", nurseIds)
       : Promise.resolve({ data: [], error: null }),
     serviceIds.length
       ? supabase.from("services").select("id, name").in("id", serviceIds)
@@ -75,6 +76,9 @@ async function enrichBookings(bookings: Booking[]): Promise<EnrichedBooking[]> {
         provider_subtitle: doctor?.specialization ?? "",
         service_name: booking.service_id ? servicesMap.get(booking.service_id) ?? null : null,
         location: locationsMap.get(booking.id) ?? null,
+        provider_location: doctor?.clinic_latitude != null && doctor.clinic_longitude != null
+          ? { latitude: doctor.clinic_latitude, longitude: doctor.clinic_longitude }
+          : null,
       };
     }
     const nurse = nursesMap.get(booking.provider_id);
@@ -85,6 +89,9 @@ async function enrichBookings(bookings: Booking[]): Promise<EnrichedBooking[]> {
       provider_subtitle: "زيارة منزلية",
       service_name: booking.service_id ? servicesMap.get(booking.service_id) ?? null : null,
       location: locationsMap.get(booking.id) ?? null,
+      provider_location: nurse?.base_latitude != null && nurse.base_longitude != null
+        ? { latitude: nurse.base_latitude, longitude: nurse.base_longitude }
+        : null,
     };
   });
 }

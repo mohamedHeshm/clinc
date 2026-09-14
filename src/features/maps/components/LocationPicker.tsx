@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
-import Map, { Marker, NavigationControl, type MapLayerMouseEvent } from "react-map-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
-import { LocateFixed, MapPin, Search } from "lucide-react";
+import { LocateFixed, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useDebounce } from "@/hooks/useDebounce";
-import { MAP_API_KEY, DEFAULT_MAP_CENTER } from "@/lib/map-config";
+import { DEFAULT_MAP_CENTER } from "@/lib/map-config";
 import { withTimeout } from "@/lib/async";
 import { searchAddress, reverseGeocode, type GeocodeResult } from "../services/geocoding.service";
+import { MedicalMap } from "./MedicalMap";
 
 export interface PickedLocation {
   latitude: number;
@@ -28,14 +27,6 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const debouncedQuery = useDebounce(searchQuery, 400);
-
-  const viewState = value
-    ? { latitude: value.latitude, longitude: value.longitude, zoom: 15 }
-    : {
-        latitude: DEFAULT_MAP_CENTER.latitude,
-        longitude: DEFAULT_MAP_CENTER.longitude,
-        zoom: DEFAULT_MAP_CENTER.zoom,
-      };
 
   // بحث فعلي عن العنوان بعد الـ debounce — Effect واحد بسيط وواضح
   useEffect(() => {
@@ -65,8 +56,12 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
     onChange({ latitude, longitude, address });
   }
 
-  async function handleMapClick(event: MapLayerMouseEvent) {
-    await selectCoordinates(event.lngLat.lat, event.lngLat.lng);
+  async function handleMapClick(point: { latitude: number; longitude: number }) {
+    try {
+      await selectCoordinates(point.latitude, point.longitude);
+    } catch {
+      toast.error("تعذّر تحديد عنوان هذا الموقع. يمكنك كتابة العنوان يدويًا.");
+    }
   }
 
   function handleUseCurrentLocation() {
@@ -134,36 +129,12 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
         {isLocating ? "جارٍ التحديد..." : "استخدام موقعي الحالي"}
       </Button>
 
-      <div className="h-64 overflow-hidden rounded-lg border border-border">
-        {MAP_API_KEY ? (
-          <Map
-            mapboxAccessToken={MAP_API_KEY}
-            initialViewState={viewState}
-            latitude={viewState.latitude}
-            longitude={viewState.longitude}
-            zoom={viewState.zoom}
-            onClick={handleMapClick}
-            mapStyle="mapbox://styles/mapbox/light-v11"
-            style={{ width: "100%", height: "100%" }}
-          >
-            <NavigationControl position="top-left" showCompass={false} />
-            {value && (
-              <Marker
-                latitude={value.latitude}
-                longitude={value.longitude}
-                draggable
-                onDragEnd={(e) => selectCoordinates(e.lngLat.lat, e.lngLat.lng)}
-              >
-                <MapPin className="h-8 w-8 -translate-y-4 fill-primary text-primary" />
-              </Marker>
-            )}
-          </Map>
-        ) : (
-          <div className="flex h-full items-center justify-center bg-surface-muted px-4 text-center text-sm text-muted-foreground">
-            الخريطة غير متاحة حاليًا — تأكد من ضبط VITE_MAP_API_KEY
-          </div>
-        )}
-      </div>
+      <MedicalMap
+        height="16rem"
+        onMapClick={handleMapClick}
+        points={value ? [{ ...value, label: "الموقع المحدد", tone: "patient" }] : []}
+      />
+      <p className="text-xs text-muted-foreground">اضغط على الخريطة لاختيار الموقع يدويًا.</p>
 
       <div className="space-y-1.5">
         <Label htmlFor="address">العنوان</Label>

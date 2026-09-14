@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/feedback/Loading";
 import { useQueryClient } from "@tanstack/react-query";
+import { LocationPicker, type PickedLocation } from "@/features/maps/components/LocationPicker";
 
 export function ProviderProfileEditPage() {
   const { data: provider, isLoading } = useMyProvider();
@@ -16,14 +17,21 @@ export function ProviderProfileEditPage() {
   const [bio, setBio] = useState("");
   const [clinicAddress, setClinicAddress] = useState("");
   const [serviceArea, setServiceArea] = useState("");
+  const [location, setLocation] = useState<PickedLocation | null>(null);
 
   useEffect(() => {
     if (provider?.doctor) {
       setBio(provider.doctor.bio ?? "");
       setClinicAddress(provider.doctor.clinic_address);
+      if (provider.doctor.clinic_latitude !== null && provider.doctor.clinic_longitude !== null) {
+        setLocation({ latitude: provider.doctor.clinic_latitude, longitude: provider.doctor.clinic_longitude, address: provider.doctor.clinic_address });
+      }
     } else if (provider?.nurse) {
       setBio(provider.nurse.bio ?? "");
       setServiceArea(provider.nurse.service_area.join("، "));
+      if (provider.nurse.base_latitude !== null && provider.nurse.base_longitude !== null) {
+        setLocation({ latitude: provider.nurse.base_latitude, longitude: provider.nurse.base_longitude, address: "" });
+      }
     }
   }, [provider]);
 
@@ -41,7 +49,7 @@ export function ProviderProfileEditPage() {
       if (provider.type === "doctor") {
         const { error } = await supabase
           .from("doctors")
-          .update({ bio, clinic_address: clinicAddress })
+          .update({ bio, clinic_address: clinicAddress, clinic_latitude: location?.latitude ?? null, clinic_longitude: location?.longitude ?? null })
           .eq("id", provider.id);
         if (error) throw error;
       } else {
@@ -49,7 +57,7 @@ export function ProviderProfileEditPage() {
           .split(/[،,]/)
           .map((a) => a.trim())
           .filter(Boolean);
-        const { error } = await supabase.from("nurses").update({ bio, service_area: areas }).eq("id", provider.id);
+        const { error } = await supabase.from("nurses").update({ bio, service_area: areas, base_latitude: location?.latitude ?? null, base_longitude: location?.longitude ?? null }).eq("id", provider.id);
         if (error) throw error;
       }
       queryClient.invalidateQueries({ queryKey: ["my-provider"] });
@@ -92,6 +100,17 @@ export function ProviderProfileEditPage() {
             <Input id="serviceArea" value={serviceArea} onChange={(e) => setServiceArea(e.target.value)} />
           </div>
         )}
+
+        <div className="space-y-1.5">
+          <Label>موقع {provider.type === "doctor" ? "العيادة" : "منطقة الانطلاق"}</Label>
+          <LocationPicker
+            value={location}
+            onChange={(nextLocation) => {
+              setLocation(nextLocation);
+              if (provider.type === "doctor") setClinicAddress(nextLocation.address);
+            }}
+          />
+        </div>
 
         <Button onClick={handleSave} disabled={isSubmitting}>
           {isSubmitting ? "جارٍ الحفظ..." : "حفظ التعديلات"}

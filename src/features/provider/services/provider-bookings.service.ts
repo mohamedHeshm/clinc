@@ -7,6 +7,7 @@ export interface ProviderBooking extends Booking {
   patient_phone: string;
   service_name: string | null;
   location: BookingLocation | null;
+  patient_location: { latitude: number; longitude: number } | null;
 }
 
 export async function fetchProviderBookings(
@@ -40,7 +41,7 @@ async function enrichProviderBookings(bookings: Booking[]): Promise<ProviderBook
   const bookingIds = bookings.map((b) => b.id);
 
   const [patientsRes, servicesRes, locationsRes] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, phone").in("id", patientIds),
+    supabase.from("profiles").select("id, full_name, phone, latitude, longitude").in("id", patientIds),
     serviceIds.length
       ? supabase.from("services").select("id, name").in("id", serviceIds)
       : Promise.resolve({ data: [], error: null }),
@@ -59,6 +60,9 @@ async function enrichProviderBookings(bookings: Booking[]): Promise<ProviderBook
       patient_phone: patient?.phone ?? "",
       service_name: booking.service_id ? servicesMap.get(booking.service_id) ?? null : null,
       location: locationsMap.get(booking.id) ?? null,
+      patient_location: patient?.latitude != null && patient.longitude != null
+        ? { latitude: patient.latitude, longitude: patient.longitude }
+        : null,
     };
   });
 }

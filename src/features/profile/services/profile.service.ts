@@ -6,6 +6,8 @@ export interface UpdateProfileInput {
   phone?: string;
   gender?: Gender;
   address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   avatar_url?: string | null;
 }
 
