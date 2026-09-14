@@ -29,22 +29,23 @@ export function NursesPage() {
   });
 
   return (
-    <div className="container py-10">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+    <div className="container py-6 sm:py-10">
+      <div className="mb-7 flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-accent/15 bg-accent px-5 py-7 text-primary-foreground shadow-elevated sm:px-8">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">التمريض المنزلي</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-xs font-semibold text-primary-foreground/70">الرعاية تصل إلى بابك</p>
+          <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">التمريض المنزلي</h1>
+          <p className="mt-2 text-sm text-primary-foreground/75">
             اطلب ممرضًا أو ممرضة للزيارة المنزلية في المكان الذي تختاره
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-primary-foreground hover:bg-white/20" asChild>
             <Link to={ROUTES.nursesNearby}>
               <MapPin className="h-4 w-4" />
               الأقرب إليك
             </Link>
           </Button>
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-primary-foreground hover:bg-white/20" asChild>
             <Link to={ROUTES.nursesUrgent}>
               <Zap className="h-4 w-4" />
               تمريض عاجل
@@ -67,7 +68,7 @@ export function NursesPage() {
         <ErrorState onRetry={() => refetch()} />
       ) : data && data.items.length > 0 ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             {data.items.map((nurse) => (
               <NurseCard key={nurse.id} nurse={nurse} />
             ))}

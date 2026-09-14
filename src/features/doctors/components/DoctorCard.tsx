@@ -9,8 +9,8 @@ import { ROUTES } from "@/constants/routes";
 
 export function DoctorCard({ doctor }: { doctor: DoctorPublic }) {
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5 transition-all hover:border-primary/20 hover:shadow-soft sm:flex-row sm:items-center">
-      <Avatar className="h-16 w-16">
+    <div className="group flex flex-col gap-4 rounded-2xl border border-border bg-surface p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:border-primary/25 hover:shadow-elevated sm:flex-row sm:items-center sm:p-5">
+      <Avatar className="h-16 w-16 ring-4 ring-primary-subtle">
         <AvatarImage src={doctor.avatar_url ?? undefined} alt={doctor.full_name} />
         <AvatarFallback className="text-lg">{doctor.full_name.charAt(0)}</AvatarFallback>
       </Avatar>
@@ -36,7 +36,7 @@ export function DoctorCard({ doctor }: { doctor: DoctorPublic }) {
             </Badge>
           )}
         </div>
-        <Button asChild size="sm">
+        <Button asChild size="sm" className="group-hover:shadow-soft">
           <Link to={ROUTES.doctorProfile(doctor.id)}>عرض الملف</Link>
         </Button>
       </div>

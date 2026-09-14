@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Activity, Menu, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ROUTES } from "@/constants/routes";
 import { Button } from "@/components/ui/button";
@@ -44,8 +44,11 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur">
       <div className="container flex h-16 items-center justify-between">
-        <Link to={ROUTES.home} className="text-lg font-bold tracking-tight text-primary">
-          Clinic
+        <Link to={ROUTES.home} className="flex items-center gap-2 text-lg font-bold tracking-tight text-primary">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-soft">
+            <Activity className="h-5 w-5" />
+          </span>
+          <span>Clinic</span>
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">

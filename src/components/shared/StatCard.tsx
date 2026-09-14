@@ -21,11 +21,11 @@ export function StatCard({ icon: Icon, label, value, tone = "neutral", className
   return (
     <div
       className={cn(
-        "rounded-lg border border-border bg-surface p-4 transition-shadow hover:shadow-soft",
+        "rounded-xl border border-border bg-surface p-4 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-elevated",
         className
       )}
     >
-      <div className={cn("flex h-9 w-9 items-center justify-center rounded-full", TONE_STYLES[tone])}>
+      <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", TONE_STYLES[tone])}>
         <Icon className="h-4.5 w-4.5" />
       </div>
       <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground">{value}</p>

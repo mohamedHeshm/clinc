@@ -32,8 +32,8 @@ export function AdminLayout() {
       <Navbar />
 
       <div className="container flex flex-1 gap-8 py-6">
-        <aside className="hidden w-56 shrink-0 lg:block">
-          <nav className="sticky top-24 space-y-1">
+        <aside className="hidden w-60 shrink-0 lg:block">
+          <nav className="sticky top-24 space-y-1 rounded-2xl border border-border bg-surface p-2 shadow-soft">
             {NAV_ITEMS.map((item) => (
               <NavLink
                 key={item.to}
@@ -41,7 +41,7 @@ export function AdminLayout() {
                 end={item.end}
                 className={({ isActive }) =>
                   cn(
-                    "flex items-center gap-2.5 rounded px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-surface-muted hover:text-foreground",
+                    "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-surface-muted hover:text-foreground",
                     isActive && "bg-primary-subtle text-primary hover:bg-primary-subtle hover:text-primary"
                   )
                 }

@@ -44,11 +44,19 @@ html {
 }
 
 body {
-  background-color: hsl(var(--background));
+  background:
+    radial-gradient(circle at 90% -10%, hsl(var(--primary) / 0.09), transparent 28rem),
+    radial-gradient(circle at 8% 28%, hsl(var(--accent) / 0.06), transparent 24rem),
+    hsl(var(--background));
   color: hsl(var(--foreground));
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   min-width: 320px;
   -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: hsl(var(--primary) / 0.16);
+  color: hsl(var(--foreground));
 }
 
 img {

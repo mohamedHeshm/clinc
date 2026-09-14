@@ -27,10 +27,11 @@ export function DoctorsPage() {
   });
 
   return (
-    <div className="container py-10">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-foreground">الأطباء</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+    <div className="container py-6 sm:py-10">
+      <div className="mb-7 rounded-2xl border border-primary/10 bg-primary px-5 py-7 text-primary-foreground shadow-elevated sm:px-8">
+        <p className="text-xs font-semibold text-primary-foreground/70">اختيارك الصحي يبدأ من هنا</p>
+        <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">ابحث عن طبيب تثق به</h1>
+        <p className="mt-2 text-sm text-primary-foreground/75">
           ابحث عن الطبيب المناسب واحجز موعدك في العيادة
         </p>
       </div>
@@ -49,7 +50,7 @@ export function DoctorsPage() {
         <ErrorState onRetry={() => refetch()} />
       ) : data && data.items.length > 0 ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             {data.items.map((doctor) => (
               <DoctorCard key={doctor.id} doctor={doctor} />
             ))}

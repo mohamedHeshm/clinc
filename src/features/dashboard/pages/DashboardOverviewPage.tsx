@@ -22,23 +22,26 @@ export function DashboardOverviewPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight text-foreground">أهلًا، {firstName} 👋</h1>
-      <p className="mt-1.5 text-sm text-muted-foreground">إليك ملخّص حسابك اليوم</p>
+      <section className="overflow-hidden rounded-2xl bg-primary px-5 py-7 text-primary-foreground shadow-elevated sm:px-7 sm:py-8">
+        <p className="text-sm text-primary-foreground/75">مرحبًا بعودتك</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">أهلًا، {firstName} 👋</h1>
+        <p className="mt-3 max-w-xl text-sm leading-relaxed text-primary-foreground/75">كل تفاصيل رعايتك في مكان واحد، من الحجز حتى متابعة الموعد.</p>
+      </section>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard icon={CalendarClock} label="حجوزات قادمة" value={upcoming?.length ?? 0} tone="primary" />
         <StatCard icon={Bell} label="إشعارات غير مقروءة" value={unreadCount} tone="accent" />
         <StatCard icon={CalendarClock} label="بانتظار الرد" value={pendingCount} tone="warning" />
       </div>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <Button asChild className="flex-1" size="lg">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <Button asChild className="h-auto min-h-16 justify-start px-5" size="lg">
           <Link to={ROUTES.doctors}>
             <Stethoscope className="h-4 w-4" />
             احجز مع طبيب
           </Link>
         </Button>
-        <Button asChild variant="outline" className="flex-1" size="lg">
+        <Button asChild variant="outline" className="h-auto min-h-16 justify-start px-5" size="lg">
           <Link to={ROUTES.nurses}>
             <HeartPulse className="h-4 w-4" />
             اطلب تمريض منزلي
@@ -64,7 +67,7 @@ export function DashboardOverviewPage() {
               <Link
                 key={booking.id}
                 to={ROUTES.dashboardBookingDetails(booking.id)}
-                className="flex items-center justify-between rounded-lg border border-border bg-surface p-4 transition-all hover:border-primary/25 hover:shadow-soft"
+                className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-soft transition-all hover:border-primary/25 hover:shadow-elevated"
               >
                 <div>
                   <p className="text-sm font-medium text-foreground">{booking.provider_name}</p>
