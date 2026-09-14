@@ -15,6 +15,7 @@ import { ROUTES } from "@/constants/routes";
 export function RegisterPage() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmationRequired, setConfirmationRequired] = useState(false);
 
   const {
     register,
@@ -25,9 +26,14 @@ export function RegisterPage() {
   const onSubmit = async (values: RegisterFormValues) => {
     setIsSubmitting(true);
     try {
-      await signUp(values);
-      toast.success("تم إنشاء الحساب بنجاح");
-      navigate(ROUTES.dashboard, { replace: true });
+      const { session } = await signUp(values);
+      if (session) {
+        toast.success("تم إنشاء الحساب وتسجيل الدخول بنجاح");
+        navigate(ROUTES.dashboard, { replace: true });
+        return;
+      }
+      setConfirmationRequired(true);
+      toast.success("تم إرسال رابط تأكيد إلى بريدك الإلكتروني");
     } catch (error) {
       toast.error(getAuthErrorMessage(error));
     } finally {
@@ -42,6 +48,13 @@ export function RegisterPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           أنشئ حسابك للبحث عن طبيب أو ممرض وحجز موعدك
         </p>
+
+        {confirmationRequired && (
+          <div className="mt-5 rounded-lg border border-accent/25 bg-accent-subtle p-4 text-sm text-foreground">
+            <p className="font-medium">تحقق من بريدك الإلكتروني</p>
+            <p className="mt-1 text-muted-foreground">افتح رسالة التأكيد ثم ارجع لتسجيل الدخول. لن تحتاج إلى حساب Vercel.</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
           <div className="space-y-1.5">

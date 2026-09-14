@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabase";
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { refreshProfile } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -56,6 +57,11 @@ export function LoginPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           سجّل الدخول لمتابعة حجوزاتك وحسابك
         </p>
+        {searchParams.get("confirmed") === "1" && (
+          <div className="mt-4 rounded-lg border border-accent/25 bg-accent-subtle p-3 text-sm text-foreground">
+            تم تأكيد بريدك الإلكتروني بنجاح. يمكنك تسجيل الدخول الآن.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
           <div className="space-y-1.5">

@@ -23,6 +23,7 @@ export async function signUp({ fullName, phone, email, password, gender, address
     email,
     password,
     options: {
+      emailRedirectTo: `${window.location.origin}/login?confirmed=1`,
       data: {
         full_name: fullName,
         phone,
