@@ -24,12 +24,14 @@ export function ProviderCalendarPage() {
 
   const bookingsByDate = useMemo(() => {
     const map = new Map<string, typeof bookings>();
+
     for (const booking of bookings ?? []) {
       const key = booking.booking_date;
       const existing = map.get(key) ?? [];
       existing.push(booking);
       map.set(key, existing as NonNullable<typeof bookings>);
     }
+
     return map;
   }, [bookings]);
 
@@ -40,11 +42,24 @@ export function ProviderCalendarPage() {
   const getDayMeta = (date: Date): CalendarDayMeta | undefined => {
     const key = format(date, "yyyy-MM-dd");
     const dayBookings = bookingsByDate.get(key);
-    if (!dayBookings || dayBookings.length === 0) return undefined;
-    const priorityStatus = dayBookings.find((b) => b.status === "pending")
+
+    if (!dayBookings || dayBookings.length === 0) {
+      return undefined;
+    }
+
+    const firstBooking = dayBookings[0];
+
+    if (!firstBooking) {
+      return undefined;
+    }
+
+    const priorityStatus = dayBookings.some((b) => b.status === "pending")
       ? "pending"
-      : dayBookings[0].status;
-    return { dotVariant: DOT_BY_STATUS[priorityStatus] };
+      : firstBooking.status;
+
+    return {
+      dotVariant: DOT_BY_STATUS[priorityStatus],
+    };
   };
 
   return (
@@ -52,20 +67,31 @@ export function ProviderCalendarPage() {
       <h1 className="text-2xl font-semibold text-foreground">التقويم</h1>
 
       <div className="mt-6">
-        <Calendar selected={selectedDate} onSelect={setSelectedDate} getDayMeta={getDayMeta} />
+        <Calendar
+          selected={selectedDate}
+          onSelect={setSelectedDate}
+          getDayMeta={getDayMeta}
+        />
       </div>
 
       <section className="mt-6">
         <h2 className="text-sm font-semibold text-foreground">
           حجوزات {format(selectedDate, "d MMMM yyyy", { locale: ar })}
         </h2>
+
         <div className="mt-3 space-y-4">
           {isLoading ? (
             <CardSkeleton />
           ) : selectedDayBookings.length > 0 ? (
-            selectedDayBookings.map((booking) => <ProviderBookingCard key={booking.id} booking={booking} />)
+            selectedDayBookings.map((booking) => (
+              <ProviderBookingCard key={booking.id} booking={booking} />
+            ))
           ) : (
-            <EmptyState icon={CalendarDays} title="لا توجد حجوزات في هذا اليوم" className="py-8" />
+            <EmptyState
+              icon={CalendarDays}
+              title="لا توجد حجوزات في هذا اليوم"
+              className="py-8"
+            />
           )}
         </div>
       </section>

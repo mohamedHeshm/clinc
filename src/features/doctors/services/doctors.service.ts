@@ -85,12 +85,20 @@ export async function fetchDoctorById(id: string): Promise<DoctorPublic | null> 
 }
 
 export async function fetchDoctorSpecializations(): Promise<string[]> {
-  const { data, error } = await supabase.from("doctors_public").select("specialization");
+  const { data, error } = await supabase
+    .from("doctors_public")
+    .select("specialization");
+
   if (error) throw error;
-  const unique = new Set((data ?? []).map((d) => d.specialization));
+
+  const unique = new Set(
+    (data ?? [])
+      .map((doctor) => doctor.specialization)
+      .filter((specialization): specialization is string => specialization !== null)
+  );
+
   return Array.from(unique).sort();
 }
-
 export interface DoctorServiceItem {
   service_id: string;
   name: string;

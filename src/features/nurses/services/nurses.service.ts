@@ -92,11 +92,19 @@ export async function fetchNursesWithLocation(): Promise<NursePublic[]> {
   return (data ?? []) as NursePublic[];
 }
 
-/** كل المناطق الفريدة المذكورة عبر كل الممرضين — تُستخدم كخيارات فلتر "المنطقة" */
 export async function fetchNurseServiceAreas(): Promise<string[]> {
-  const { data, error } = await supabase.from("nurses_public").select("service_area");
+  const { data, error } = await supabase
+    .from("nurses_public")
+    .select("service_area");
+
   if (error) throw error;
-  const unique = new Set((data ?? []).flatMap((n) => n.service_area));
+
+  const unique = new Set(
+    (data ?? [])
+      .flatMap((nurse) => nurse.service_area ?? [])
+      .filter((area): area is string => area !== null)
+  );
+
   return Array.from(unique).sort();
 }
 

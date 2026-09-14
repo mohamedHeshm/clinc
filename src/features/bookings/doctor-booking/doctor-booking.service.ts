@@ -11,12 +11,20 @@ export interface CreateDoctorBookingInput {
 }
 
 /**
- * الحماية الحقيقية ضد Double Booking موجودة في قاعدة البيانات (exclusion
- * constraint) — هذه الدالة فقط تلتقط رسالة التعارض وتحوّلها لعلم مميّز
- * (isSlotConflict) بدل ما تبقى Exception عامة، عشان الواجهة تقدر تعرض
- * "عذرًا، هذا الموعد لم يعد متاحًا" وتقترح إعادة اختيار الوقت تلقائيًا.
+ * الحماية الحقيقية ضد Double Booking موجودة في قاعدة البيانات
+ * (exclusion constraint).
+ *
+ * هذه الدالة تلتقط رسالة التعارض وتحوّلها لعلم مميّز
+ * (isSlotConflict) حتى تتمكن الواجهة من عرض رسالة مناسبة
+ * واقتراح إعادة اختيار الوقت.
  */
-export async function createDoctorBooking(input: CreateDoctorBookingInput) {
+export async function createDoctorBooking(
+  input: CreateDoctorBookingInput
+) {
+  if (!input.serviceId) {
+    throw new Error("يجب اختيار الخدمة قبل حجز الموعد");
+  }
+
   const { data, error } = await supabase.rpc("create_booking", {
     p_provider_id: input.doctorId,
     p_provider_type: "doctor",
@@ -25,12 +33,17 @@ export async function createDoctorBooking(input: CreateDoctorBookingInput) {
     p_start: input.startTime,
     p_end: input.endTime,
     p_price: input.price,
-    p_notes: input.notes ?? null,
+    ...(input.notes ? { p_notes: input.notes } : {}),
   });
 
   if (error) {
-    const isSlotConflict = error.code === "23P01" || error.message.includes("لم يعد متاحًا");
-    throw Object.assign(new Error(error.message), { isSlotConflict });
+    const isSlotConflict =
+      error.code === "23P01" ||
+      error.message.includes("لم يعد متاحًا");
+
+    throw Object.assign(new Error(error.message), {
+      isSlotConflict,
+    });
   }
 
   return data;
