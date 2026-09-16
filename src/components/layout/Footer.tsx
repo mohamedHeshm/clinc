@@ -14,7 +14,7 @@ export function Footer() {
           <p className="mt-2">
             تطوير وتصميم{" "}
             <span className="font-semibold text-foreground">
-              ENG Mohamed Hesham
+             المهندس محمد هشام 
             </span>
             {" · "}
             <a
