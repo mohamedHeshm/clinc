@@ -14,7 +14,7 @@ export function Footer() {
           <p className="mt-2">
             تطوير وتصميم{" "}
             <span className="font-semibold text-foreground">
-             المهندس محمد هشام 
+             المهندس محمد هشام
             </span>
             {" · "}
             <a
@@ -23,7 +23,7 @@ export function Footer() {
               rel="noopener noreferrer"
               className="font-medium text-primary transition-colors hover:underline"
             >
-              تواصل معي على WhatsApp
+             انقر للتواصل معي على WhatsApp
             </a>
           </p>
         </div>
