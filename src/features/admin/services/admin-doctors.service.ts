@@ -75,45 +75,49 @@ export interface CreateDoctorAccountInput {
  * service_role. راجع تعليمات نشر الدالة في README قبل استخدام هذا الفورم.
  */
 export async function createDoctorAccount(input: CreateDoctorAccountInput) {
-  const { data, error } = await supabase.functions.invoke("admin-create-provider-account", {
-    body: {
-      fullName: input.fullName,
-      phone: input.phone,
-      email: input.email,
-      temporaryPassword: input.temporaryPassword,
-      providerType: "doctor",
-      doctor: {
-        specialization: input.specialization,
-        bio: input.bio,
-        experienceYears: input.experienceYears,
-        clinicAddress: input.clinicAddress,
-        clinicLatitude: input.clinicLatitude,
-        clinicLongitude: input.clinicLongitude,
-        consultationPrice: input.consultationPrice,
+  const { data, error } = await supabase.functions.invoke(
+    "admin-create-provider-account",
+    {
+      body: {
+        fullName: input.fullName,
+        phone: input.phone,
+        email: input.email,
+        temporaryPassword: input.temporaryPassword,
+        providerType: "doctor",
+        doctor: {
+          specialization: input.specialization,
+          bio: input.bio,
+          experienceYears: input.experienceYears,
+          clinicAddress: input.clinicAddress,
+          clinicLatitude: input.clinicLatitude,
+          clinicLongitude: input.clinicLongitude,
+          consultationPrice: input.consultationPrice,
+        },
       },
     },
-  });
+  );
 
-if (error) {
-  console.error("❌ Edge Function Error:", error);
-  console.error("❌ Error context:", error.context);
+  if (error) {
+    console.error("❌ Edge Function Error:", error);
+    console.error("❌ Error context:", error.context);
 
-  try {
-    const response = error.context as Response;
+    try {
+      const response = error.context as Response;
 
-    if (response) {
-      const responseText = await response.text();
-      console.error("❌ Server response:", responseText);
+      if (response) {
+        const responseText = await response.text();
+        console.error("❌ Server response:", responseText);
+      }
+    } catch (e) {
+      console.error("❌ Could not read server response:", e);
     }
-  } catch (e) {
-    console.error("❌ Could not read server response:", e);
+
+    throw error;
   }
 
-  throw error;
-}
-
-console.log("✅ Provider created:", data);
-return data;
+  console.log("✅ Provider created:", data);
+  return data;
+} // ← دي كانت ناقصة
 
 export interface UpdateDoctorInput {
   specialization?: string;

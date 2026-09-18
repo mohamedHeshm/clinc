@@ -65,13 +65,15 @@ export interface CreateNurseAccountInput {
 }
 
 export async function createNurseAccount(input: CreateNurseAccountInput) {
+  const session = (await supabase.auth.getSession()).data.session;
+
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-provider-account`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        Authorization: `Bearer ${session?.access_token ?? ""}`,
         apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({
@@ -89,7 +91,7 @@ export async function createNurseAccount(input: CreateNurseAccountInput) {
           baseLongitude: input.baseLongitude,
         },
       }),
-    }
+    },
   );
 
   const responseText = await response.text();
@@ -102,33 +104,14 @@ export async function createNurseAccount(input: CreateNurseAccountInput) {
   }
 
   try {
-    return JSON.parse(responseText);
+    const result = JSON.parse(responseText);
+    console.log("✅ Nurse account created:", result);
+    return result;
   } catch {
+    console.log("✅ Nurse account created:", responseText);
     return responseText;
   }
 }
-
- if (error) {
-   console.error("❌ admin-create-provider-account error:", error);
-   console.error("❌ error context:", error.context);
-
-   try {
-     const response = error.context as Response;
-
-     if (response) {
-       const responseText = await response.text();
-       console.error("❌ Server response:", responseText);
-     }
-   } catch (e) {
-     console.error("❌ Failed to read server response:", e);
-   }
-
-   throw error;
- }
-
- console.log("✅ Nurse account created:", data);
- return data;
-
 export interface UpdateNurseInput {
   bio?: string | null;
   experience_years?: number;
