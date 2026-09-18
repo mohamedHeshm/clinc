@@ -65,23 +65,48 @@ export interface CreateNurseAccountInput {
 }
 
 export async function createNurseAccount(input: CreateNurseAccountInput) {
-  const { data, error } = await supabase.functions.invoke("admin-create-provider-account", {
-    body: {
-      fullName: input.fullName,
-      phone: input.phone,
-      email: input.email,
-      temporaryPassword: input.temporaryPassword,
-      providerType: "nurse",
-      nurse: {
-        bio: input.bio,
-        experienceYears: input.experienceYears,
-        serviceArea: input.serviceArea,
-        visitPrice: input.visitPrice,
-        baseLatitude: input.baseLatitude,
-        baseLongitude: input.baseLongitude,
+  const response = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-provider-account`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       },
-    },
-  });
+      body: JSON.stringify({
+        fullName: input.fullName,
+        phone: input.phone,
+        email: input.email,
+        temporaryPassword: input.temporaryPassword,
+        providerType: "nurse",
+        nurse: {
+          bio: input.bio,
+          experienceYears: input.experienceYears,
+          serviceArea: input.serviceArea,
+          visitPrice: input.visitPrice,
+          baseLatitude: input.baseLatitude,
+          baseLongitude: input.baseLongitude,
+        },
+      }),
+    }
+  );
+
+  const responseText = await response.text();
+
+  console.log("🔴 Status:", response.status);
+  console.log("🔴 Server response:", responseText);
+
+  if (!response.ok) {
+    throw new Error(responseText || `HTTP ${response.status}`);
+  }
+
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    return responseText;
+  }
+}
 
  if (error) {
    console.error("❌ admin-create-provider-account error:", error);
