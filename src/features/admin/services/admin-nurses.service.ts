@@ -6,7 +6,9 @@ export interface AdminNurseRow extends Nurse {
   account_status: "active" | "suspended";
 }
 
-export async function fetchAdminNurses(search?: string): Promise<AdminNurseRow[]> {
+export async function fetchAdminNurses(
+  search?: string,
+): Promise<AdminNurseRow[]> {
   const { data, error } = await supabase
     .from("nurses")
     .select("*, profiles!nurses_profile_id_fkey(full_name, status)")
@@ -15,7 +17,11 @@ export async function fetchAdminNurses(search?: string): Promise<AdminNurseRow[]
   if (error) throw error;
 
   let rows = (data ?? []).map((row) => {
-    const profile = row.profiles as unknown as { full_name: string; status: "active" | "suspended" };
+    const profile = row.profiles as unknown as {
+      full_name: string;
+      status: "active" | "suspended";
+    };
+
     return {
       ...(row as unknown as Nurse),
       full_name: profile?.full_name ?? "",
@@ -25,13 +31,18 @@ export async function fetchAdminNurses(search?: string): Promise<AdminNurseRow[]
 
   if (search?.trim()) {
     const term = search.trim().toLowerCase();
-    rows = rows.filter((r) => r.full_name.toLowerCase().includes(term));
+
+    rows = rows.filter((r) =>
+      r.full_name.toLowerCase().includes(term),
+    );
   }
 
   return rows;
 }
 
-export async function fetchAdminNurseById(nurseId: string): Promise<AdminNurseRow | null> {
+export async function fetchAdminNurseById(
+  nurseId: string,
+): Promise<AdminNurseRow | null> {
   const { data, error } = await supabase
     .from("nurses")
     .select("*, profiles!nurses_profile_id_fkey(full_name, status)")
@@ -43,7 +54,11 @@ export async function fetchAdminNurseById(nurseId: string): Promise<AdminNurseRo
     throw error;
   }
 
-  const profile = data.profiles as unknown as { full_name: string; status: "active" | "suspended" };
+  const profile = data.profiles as unknown as {
+    full_name: string;
+    status: "active" | "suspended";
+  };
+
   return {
     ...(data as unknown as Nurse),
     full_name: profile?.full_name ?? "",
@@ -64,7 +79,9 @@ export interface CreateNurseAccountInput {
   baseLongitude?: number;
 }
 
-export async function createNurseAccount(input: CreateNurseAccountInput) {
+export async function createNurseAccount(
+  input: CreateNurseAccountInput,
+) {
   const session = (await supabase.auth.getSession()).data.session;
 
   const response = await fetch(
@@ -96,22 +113,19 @@ export async function createNurseAccount(input: CreateNurseAccountInput) {
 
   const responseText = await response.text();
 
-  console.log("🔴 Status:", response.status);
-  console.log("🔴 Server response:", responseText);
-
   if (!response.ok) {
-    throw new Error(responseText || `HTTP ${response.status}`);
+    throw new Error(
+      responseText || `HTTP ${response.status}`,
+    );
   }
 
   try {
-    const result = JSON.parse(responseText);
-    console.log("✅ Nurse account created:", result);
-    return result;
+    return JSON.parse(responseText);
   } catch {
-    console.log("✅ Nurse account created:", responseText);
     return responseText;
   }
 }
+
 export interface UpdateNurseInput {
   bio?: string | null;
   experience_years?: number;
@@ -122,8 +136,16 @@ export interface UpdateNurseInput {
   base_longitude?: number | null;
 }
 
-export async function updateNurseAsAdmin(nurseId: string, updates: UpdateNurseInput, description: string) {
-  const { error } = await supabase.from("nurses").update(updates).eq("id", nurseId);
+export async function updateNurseAsAdmin(
+  nurseId: string,
+  updates: UpdateNurseInput,
+  description: string,
+) {
+  const { error } = await supabase
+    .from("nurses")
+    .update(updates)
+    .eq("id", nurseId);
+
   if (error) throw error;
 
   await supabase.rpc("admin_log_action", {
@@ -134,10 +156,17 @@ export async function updateNurseAsAdmin(nurseId: string, updates: UpdateNurseIn
   });
 }
 
-export async function setNurseAccountStatus(profileId: string, status: "active" | "suspended") {
-  const { error } = await supabase.rpc("admin_set_account_status", {
-    p_profile_id: profileId,
-    p_status: status,
-  });
+export async function setNurseAccountStatus(
+  profileId: string,
+  status: "active" | "suspended",
+) {
+  const { error } = await supabase.rpc(
+    "admin_set_account_status",
+    {
+      p_profile_id: profileId,
+      p_status: status,
+    },
+  );
+
   if (error) throw error;
 }
