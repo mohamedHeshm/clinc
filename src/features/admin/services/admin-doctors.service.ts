@@ -94,9 +94,26 @@ export async function createDoctorAccount(input: CreateDoctorAccountInput) {
     },
   });
 
-  if (error) throw error;
-  return data;
+if (error) {
+  console.error("❌ Edge Function Error:", error);
+  console.error("❌ Error context:", error.context);
+
+  try {
+    const response = error.context as Response;
+
+    if (response) {
+      const responseText = await response.text();
+      console.error("❌ Server response:", responseText);
+    }
+  } catch (e) {
+    console.error("❌ Could not read server response:", e);
+  }
+
+  throw error;
 }
+
+console.log("✅ Provider created:", data);
+return data;
 
 export interface UpdateDoctorInput {
   specialization?: string;

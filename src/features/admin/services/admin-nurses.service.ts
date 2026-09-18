@@ -83,9 +83,26 @@ export async function createNurseAccount(input: CreateNurseAccountInput) {
     },
   });
 
-  if (error) throw error;
-  return data;
-}
+ if (error) {
+   console.error("❌ admin-create-provider-account error:", error);
+   console.error("❌ error context:", error.context);
+
+   try {
+     const response = error.context as Response;
+
+     if (response) {
+       const responseText = await response.text();
+       console.error("❌ Server response:", responseText);
+     }
+   } catch (e) {
+     console.error("❌ Failed to read server response:", e);
+   }
+
+   throw error;
+ }
+
+ console.log("✅ Nurse account created:", data);
+ return data;
 
 export interface UpdateNurseInput {
   bio?: string | null;
