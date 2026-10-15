@@ -23,8 +23,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
+
+const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash";
 const ALLOWED_ORIGINS = new Set([
   "https://clinc-ochre.vercel.app",
   "http://localhost:5173",
@@ -385,12 +387,35 @@ Deno.serve(async (req) => {
         clearTimeout(timeout);
 
         if (!res.ok) {
-          aiError = res.status === 429 ? "AI_RATE_LIMITED" : "AI_REQUEST_FAILED";
+          // Log Gemini's response for diagnosis, but never log the API key.
+          const errorBody = await res.text();
+          console.error(
+            "[GEMINI_API_ERROR]",
+            JSON.stringify({
+              status: res.status,
+              statusText: res.statusText,
+              body: errorBody.slice(0, 3000),
+              model: GEMINI_MODEL,
+            }),
+          );
+
+          aiError =
+            res.status === 429
+              ? "AI_RATE_LIMITED"
+              : res.status === 401 || res.status === 403
+                ? "AI_AUTH_ERROR"
+                : res.status === 400
+                  ? "AI_BAD_REQUEST"
+                  : "AI_REQUEST_FAILED";
         } else {
           const data = await res.json();
           const parts = data.candidates?.[0]?.content?.parts ?? [];
           const functionCall = parts.find((part: { functionCall?: unknown }) => part.functionCall)?.functionCall;
           if (!functionCall || functionCall.name !== ASSESSMENT_TOOL.name) {
+            console.error(
+              "[GEMINI_INVALID_RESPONSE]",
+              JSON.stringify(data).slice(0, 3000),
+            );
             aiError = "AI_INVALID_RESPONSE";
           } else {
             aiResult = validateAssessmentOutput(functionCall.args);
@@ -398,7 +423,14 @@ Deno.serve(async (req) => {
           }
         }
       } catch (e) {
-        aiError = e instanceof Error && e.name === "AbortError" ? "AI_TIMEOUT" : "AI_REQUEST_FAILED";
+        console.error("[GEMINI_FETCH_ERROR]", {
+          name: e instanceof Error ? e.name : "UnknownError",
+          message: e instanceof Error ? e.message : String(e),
+        });
+        aiError =
+          e instanceof Error && e.name === "AbortError"
+            ? "AI_TIMEOUT"
+            : "AI_REQUEST_FAILED";
       }
     }
 
