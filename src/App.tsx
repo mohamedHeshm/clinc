@@ -49,6 +49,7 @@ import { AdminBookingsPage } from "@/features/admin/pages/AdminBookingsPage";
 import { AdminBookingDetailsPage } from "@/features/admin/pages/AdminBookingDetailsPage";
 import { AdminAnalyticsPage } from "@/features/admin/pages/AdminAnalyticsPage";
 import { AdminAuditLogPage } from "@/features/admin/pages/AdminAuditLogPage";
+import AIAssistantPage from "@/pages/AIAssistantPage";
 
 /**
  * خريطة المسارات الكاملة كما هي موثّقة في 01-architecture.md.
@@ -72,6 +73,7 @@ export default function App() {
         <Route path={ROUTES.nursesUrgent} element={<NursesUrgentPage />} />
         <Route path={ROUTES.howItWorks} element={<HowItWorksPage />} />
         <Route path={ROUTES.about} element={<AboutPage />} />
+        <Route path={ROUTES.aiAssistant} element={<AIAssistantPage />} />
       </Route>
 
       {/* Authentication — بدون Navbar/Footer، تخطيط مركزي خاص بها */}

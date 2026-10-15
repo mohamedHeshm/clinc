@@ -9,6 +9,7 @@ export const ROUTES = {
   nursesUrgent: "/nurses/urgent",
   howItWorks: "/how-it-works",
   about: "/about",
+  aiAssistant: "/ai-assistant",
   login: "/login",
   register: "/register",
   forgotPassword: "/forgot-password",

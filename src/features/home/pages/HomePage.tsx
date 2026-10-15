@@ -1,11 +1,17 @@
-import { HeroSection } from "../components/HeroSection";
-import { SearchSection } from "../components/SearchSection";
+import { AssistantEntryBanner } from "@/components/ai-assistant/AssistantEntryBanner";
+import { SearchSection } from "@/features/home/components/SearchSection";
+import { HeroSection } from "@/features/home/components/HeroSection";
 
 export function HomePage() {
   return (
-    <div>
+    <>
       <HeroSection />
+      <div className="container pb-8">
+        <AssistantEntryBanner />
+      </div>
       <SearchSection />
-    </div>
+    </>
   );
 }
+
+export default HomePage;
