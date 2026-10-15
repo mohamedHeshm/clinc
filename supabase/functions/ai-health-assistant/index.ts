@@ -23,7 +23,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const GEMINI_API_KEY = Deno.env.get("AQ.Ab8RN6KmLmZArxEpgPmH0nL4fNaaGRJ0w-d9LaeCN8y5-hapxQ");
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
 const ALLOWED_ORIGINS = new Set([
   "https://clinc-ochre.vercel.app",
