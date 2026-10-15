@@ -25,6 +25,14 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const ANTHROPIC_MODEL = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-4-5-20250929";
+const ALLOWED_ORIGINS = new Set([
+  "https://clinc-ochre.vercel.app",
+  "http://localhost:5173",
+  ...(Deno.env.get("CORS_ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+]);
 
 const MAX_SESSIONS_PER_HOUR = 8;
 const AI_TIMEOUT_MS = 20_000;
@@ -137,8 +145,22 @@ interface RequestBody {
 }
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get("Origin");
+
+  if (req.method === "OPTIONS") {
+    if (!origin || !ALLOWED_ORIGINS.has(origin)) {
+      return new Response("Origin not allowed", { status: 403 });
+    }
+
+    return new Response("ok", { headers: corsHeaders(origin) });
+  }
+
+  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+    return json({ error: "Origin not allowed" }, 403, req);
+  }
+
   try {
-    if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+    if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, req);
 
     // ---- المصادقة: لازم تسجيل دخول فعلي ----
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -147,7 +169,7 @@ Deno.serve(async (req) => {
     });
     const { data: userData, error: userErr } = await callerClient.auth.getUser();
     if (userErr || !userData.user) {
-      return json({ error: "يجب تسجيل الدخول لاستخدام المساعد الصحي الذكي" }, 401);
+      return json({ error: "يجب تسجيل الدخول لاستخدام المساعد الصحي الذكي" }, 401, req);
     }
     const patientId = userData.user.id;
 
@@ -155,8 +177,8 @@ Deno.serve(async (req) => {
 
     const body = (await req.json()) as RequestBody;
     const message = (body.message ?? "").trim();
-    if (!message) return json({ error: "الرسالة فارغة" }, 400);
-    if (message.length > 2000) return json({ error: "الرسالة طويلة جدًا" }, 400);
+    if (!message) return json({ error: "الرسالة فارغة" }, 400, req);
+    if (message.length > 2000) return json({ error: "الرسالة طويلة جدًا" }, 400, req);
 
     // ---- تحميل أو إنشاء الجلسة ----
     let session: Record<string, unknown> | null = null;
@@ -180,7 +202,8 @@ Deno.serve(async (req) => {
       if ((recentCount ?? 0) >= MAX_SESSIONS_PER_HOUR) {
         return json(
           { error: "لقد استخدمت المساعد الصحي عدة مرات خلال الساعة الماضية، برجاء المحاولة لاحقًا." },
-          429
+          429,
+          req
         );
       }
 
@@ -189,7 +212,7 @@ Deno.serve(async (req) => {
         .insert({ patient_id: patientId })
         .select("*")
         .single();
-      if (createErr || !created) return json({ error: "تعذّر بدء جلسة جديدة" }, 500);
+      if (createErr || !created) return json({ error: "تعذّر بدء جلسة جديدة" }, 500, req);
       session = created;
     }
 
@@ -282,7 +305,7 @@ Deno.serve(async (req) => {
       .select("*")
       .single();
 
-    if (updateErr) return json({ error: "تعذّر حفظ الجلسة" }, 500);
+    if (updateErr) return json({ error: "تعذّر حفظ الجلسة" }, 500, req);
 
     return json({
       sessionId: updatedSession.id,
@@ -295,9 +318,9 @@ Deno.serve(async (req) => {
       emergency_reasons: emergencyReasons,
       recommended_specialties: updatedSession.recommended_specialties,
       ai_error: aiError, // null يعني كل شيء تمام؛ غير ذلك الواجهة تعرض رسالة بديلة مناسبة
-    });
+    }, 200, req);
   } catch (e) {
-    return json({ error: e instanceof Error ? e.message : "خطأ غير متوقع" }, 500);
+    return json({ error: e instanceof Error ? e.message : "خطأ غير متوقع" }, 500, req);
   }
 });
 
@@ -323,8 +346,23 @@ function validateAssessmentOutput(input: unknown): Record<string, unknown> | nul
   return obj;
 }
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+function corsHeaders(origin: string): Headers {
+  return new Headers({
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin",
+  });
+}
+
+function json(body: unknown, status = 200, req?: Request) {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  const origin = req?.headers.get("Origin");
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    for (const [key, value] of corsHeaders(origin)) headers.set(key, value);
+  }
+  return new Response(JSON.stringify(body), { status, headers });
 }
 
 // ============================================================================
