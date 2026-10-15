@@ -23,7 +23,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+const GEMINI_API_KEY = Deno.env.get("AQ.Ab8RN6KmLmZArxEpgPmH0nL4fNaaGRJ0w-d9LaeCN8y5-hapxQ");
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
 const ALLOWED_ORIGINS = new Set([
   "https://clinc-ochre.vercel.app",
@@ -297,26 +297,42 @@ Deno.serve(async (req) => {
     }
 
     if (!session) {
-      // ---- Rate limiting: فقط عند إنشاء جلسة جديدة ----
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const { data: recentCount } = await admin.rpc("count_recent_ai_sessions", {
-        p_patient_id: patientId,
-        p_since: oneHourAgo,
-      });
-      if ((recentCount ?? 0) >= MAX_SESSIONS_PER_HOUR) {
-        return json(
-          { error: "لقد استخدمت المساعد الصحي عدة مرات خلال الساعة الماضية، برجاء المحاولة لاحقًا." },
-          429,
-          req
-        );
-      }
+      // ---- تشخيص مؤقت: تجاوز فحص عدد الجلسات لتحديد سبب فشل الإنشاء ----
+      // أعد تفعيل Rate Limiting بعد إصلاح الإنشاء قبل استخدام الدالة في الإنتاج.
+      console.warn(
+        "[AI_SESSION_COUNT_BYPASSED]",
+        "Rate limit check is temporarily disabled for diagnosis",
+      );
 
       const { data: created, error: createErr } = await admin
         .from("ai_assessment_sessions")
         .insert({ patient_id: patientId })
         .select("*")
         .single();
-      if (createErr || !created) return json({ error: "تعذّر بدء جلسة جديدة" }, 500, req);
+
+      if (createErr || !created) {
+        console.error(
+          "[AI_SESSION_CREATE_ERROR]",
+          JSON.stringify({
+            code: createErr?.code ?? null,
+            message: createErr?.message ?? null,
+            details: createErr?.details ?? null,
+            hint: createErr?.hint ?? null,
+            status: (createErr as { status?: number } | null)?.status ?? null,
+            name: createErr?.name ?? null,
+          }),
+        );
+
+        return json(
+          {
+            error: "تعذّر بدء جلسة جديدة",
+            code: createErr?.code ?? "UNKNOWN",
+          },
+          500,
+          req,
+        );
+      }
+
       session = created;
     }
 
