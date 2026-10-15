@@ -2,29 +2,29 @@
 //
 // المساعد الصحي الذكي — نقطة الدخول الوحيدة للتواصل مع مزوّد الذكاء
 // الاصطناعي. مفتاح الـ API لا يُكشف أبدًا للواجهة الأمامية — يُقرأ هنا فقط
-// من ANTHROPIC_API_KEY (Supabase Secret).
+// من GEMINI_API_KEY (Supabase Secret).
 //
 // مسؤوليات هذا الملف بالترتيب:
 //   1) التحقق من تسجيل الدخول (لا استخدام مجهول الهوية — لتفعيل Rate Limiting)
 //   2) تطبيق حد استخدام بسيط لكل مستخدم (Rate Limiting)
 //   3) فحص طوارئ حتمي (Deterministic Ruleset) مستقل تمامًا عن الذكاء
 //      الاصطناعي — يعمل حتى لو فشل استدعاء الذكاء الاصطناعي بالكامل
-//   4) استدعاء Anthropic Messages API مع إجبار إخراج مُهيكل (Tool Use)
+//   4) استدعاء Gemini API مع إجبار إخراج مُهيكل (Function Calling)
 //   5) التحقق من صحة الإخراج المُهيكل قبل استخدامه (Schema Validation)
 //   6) حفظ/تحديث الجلسة في قاعدة البيانات (بيانات مُهيكلة فقط، لا أرشيف دردشة)
 //   7) إرجاع استجابة مُهيكلة وآمنة للواجهة الأمامية
 //
 //
 // نشر: supabase functions deploy ai-health-assistant
-// إعداد السر المطلوب: supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-// (اختياري) supabase secrets set ANTHROPIC_MODEL=claude-sonnet-4-5-20250929
+// إعداد السر المطلوب: supabase secrets set GEMINI_API_KEY=YOUR_NEW_KEY
+// (اختياري) supabase secrets set GEMINI_MODEL=gemini-2.5-flash
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-const ANTHROPIC_MODEL = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-4-5-20250929";
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
 const ALLOWED_ORIGINS = new Set([
   "https://clinc-ochre.vercel.app",
   "http://localhost:5173",
@@ -44,7 +44,59 @@ const MAX_RECENT_TURNS_KEPT = 12; // آخر 12 رسالة فقط تُحفظ كس
 //     وليست نظام فرز طبي معتمد — يجب مراجعتها وتوسيعها من فريق طبي مؤهل
 //     قبل أي استخدام إنتاجي حقيقي (انظر ملاحظة "تنبيه" في نهاية الدالة).
 // ----------------------------------------------------------------------------
-import { runEmergencyRuleset } from "./emergency.ts";
+// Keep this ruleset in index.ts as well as emergency.ts: Supabase Studio's
+// inline function editor deploys only index.ts, while the local test imports
+// the separately maintained module.
+function runEmergencyRuleset(text: string): { isEmergency: boolean; reasons: string[]; selfHarm: boolean } {
+  const rules = [
+    {
+      patterns: [/chest pain/i, /can'?t breathe/i, /shortness of breath/i, /difficulty breathing/i,
+        /ألم في الصدر/, /ضيق في التنفس/, /مش قادر اتنفس/, /صعوبة في التنفس/, /ضيق تنفس/],
+      reason: "ألم بالصدر أو ضيق في التنفس قد يشير لحالة قلبية أو تنفسية طارئة",
+    },
+    {
+      patterns: [/face drooping/i, /slurred speech/i, /one side.*(weak|numb)/i, /sudden.*(weak|numb)ness/i,
+        /تدلي الوجه/, /كلام غير واضح/, /تنميل في نص الجسم/, /ضعف مفاجئ في جانب/, /خدران في نصف/],
+      reason: "علامات محتملة لجلطة دماغية (ضعف مفاجئ، تنميل، صعوبة كلام)",
+    },
+    {
+      patterns: [/severe bleeding/i, /won'?t stop bleeding/i, /نزيف شديد/, /نزيف لا يتوقف/, /فقدان دم كتير/],
+      reason: "نزيف شديد أو لا يتوقف",
+    },
+    {
+      patterns: [/lost consciousness/i, /passed out/i, /fainted/i, /فقدان الوعي/, /غاب عن الوعي/, /أغمى عليه/, /اغمى عليا/],
+      reason: "فقدان الوعي أو الإغماء",
+    },
+    {
+      patterns: [/allergic reaction.*(swelling|breath)/i, /anaphylaxis/i, /حساسية شديدة/, /تورم في الوجه.*تنفس/, /صعوبة بلع وتورم/],
+      reason: "علامات رد فعل تحسسي شديد (تورم مع صعوبة تنفس)",
+    },
+    {
+      patterns: [/infant.*fever/i, /baby.*high fever/i, /رضيع.*حرارة عالية/, /طفل رضيع.*سخونة شديدة/],
+      reason: "حرارة شديدة عند رضيع — تحتاج تقييمًا طبيًا فوريًا",
+    },
+    {
+      patterns: [/poisoning/i, /overdose/i, /تسمم/, /جرعة زايدة/, /جرعة زائدة/],
+      reason: "احتمال تسمم أو جرعة دوائية زائدة",
+    },
+    {
+      patterns: [/seizure/i, /convulsion/i, /تشنج/, /نوبة صرع/],
+      reason: "نوبة تشنج",
+    },
+    {
+      patterns: [/suicide/i, /kill myself/i, /end my life/i, /self.?harm/i,
+        /انتحار/, /أؤذي نفسي/, /هأذي نفسي/, /مش عايز أعيش/, /عايز أموت/, /هنهي حياتي/],
+      reason: "أفكار متعلقة بإيذاء النفس — هذه حالة تحتاج دعمًا فوريًا",
+      selfHarm: true,
+    },
+  ];
+  const matched = rules.filter((rule) => rule.patterns.some((pattern) => pattern.test(text)));
+  return {
+    isEmergency: matched.length > 0,
+    reasons: matched.map((rule) => rule.reason),
+    selfHarm: matched.some((rule) => rule.selfHarm === true),
+  };
+}
 
 // ----------------------------------------------------------------------------
 // [2] مخطط الإخراج المُهيكل الذي نُجبر Claude على الالتزام به عبر Tool Use
@@ -102,6 +154,58 @@ const ASSESSMENT_TOOL = {
             name: { type: "string", description: "اسم التخصص الطبي بالعربي (مثال: باطنة، جلدية، عظام)." },
             confidence_label: { type: "string", enum: ["high", "medium", "low"] },
             reason: { type: "string" },
+          },
+          required: ["name", "confidence_label", "reason"],
+        },
+      },
+    },
+    required: ["reply_text", "stage", "symptom_summary", "ai_suspected_emergency"],
+  },
+};
+
+// Gemini Function Calling accepts a subset of JSON Schema. Nullable fields
+// are represented as optional fields, and the output is validated below.
+const GEMINI_ASSESSMENT_FUNCTION = {
+  name: ASSESSMENT_TOOL.name,
+  description: ASSESSMENT_TOOL.description,
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      reply_text: { type: "STRING", description: "رد قصير بلغة المريض." },
+      stage: { type: "STRING", enum: ["collecting", "ready_for_summary", "recommendations"] },
+      follow_up_questions: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: {
+            id: { type: "STRING" },
+            type: { type: "STRING", enum: ["single_choice", "multi_choice", "severity_scale", "duration", "yes_no", "free_text"] },
+            prompt: { type: "STRING" },
+            options: { type: "ARRAY", items: { type: "STRING" } },
+          },
+          required: ["id", "type", "prompt"],
+        },
+      },
+      symptom_summary: {
+        type: "OBJECT",
+        properties: {
+          symptoms: { type: "ARRAY", items: { type: "STRING" } },
+          duration: { type: "STRING" },
+          severity: { type: "STRING" },
+          context: { type: "STRING" },
+        },
+        required: ["symptoms"],
+      },
+      ai_suspected_emergency: { type: "BOOLEAN" },
+      ai_emergency_reason: { type: "STRING" },
+      recommended_specialties: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: {
+            name: { type: "STRING" },
+            confidence_label: { type: "STRING", enum: ["high", "medium", "low"] },
+            reason: { type: "STRING" },
           },
           required: ["name", "confidence_label", "reason"],
         },
@@ -220,11 +324,11 @@ Deno.serve(async (req) => {
     const priorText = ((session.recent_turns as IncomingTurn[]) ?? []).map((t) => t.content).join(" ");
     const ruleCheck = runEmergencyRuleset(`${priorText} ${message}`);
 
-    // ---- [4] استدعاء Anthropic — مع مهلة زمنية ومعالجة فشل كاملة ----
+    // ---- [4] استدعاء Gemini — مع مهلة زمنية ومعالجة فشل كاملة ----
     let aiResult: Record<string, unknown> | null = null;
     let aiError: string | null = null;
 
-    if (!ANTHROPIC_API_KEY) {
+    if (!GEMINI_API_KEY) {
       aiError = "AI_NOT_CONFIGURED";
     } else {
       try {
@@ -236,34 +340,44 @@ Deno.serve(async (req) => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
 
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
+          {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
+            "x-goog-api-key": GEMINI_API_KEY,
           },
           body: JSON.stringify({
-            model: ANTHROPIC_MODEL,
-            max_tokens: 1200,
-            system: SYSTEM_PROMPT,
-            messages: turns.map((t) => ({ role: t.role, content: t.content })),
-            tools: [ASSESSMENT_TOOL],
-            tool_choice: { type: "tool", name: "provide_assessment_response" },
+            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents: turns.map((t) => ({
+              role: t.role === "assistant" ? "model" : "user",
+              parts: [{ text: t.content }],
+            })),
+            tools: [{ functionDeclarations: [GEMINI_ASSESSMENT_FUNCTION] }],
+            toolConfig: {
+              functionCallingConfig: {
+                mode: "ANY",
+                allowedFunctionNames: [ASSESSMENT_TOOL.name],
+              },
+            },
+            generationConfig: { maxOutputTokens: 1200, temperature: 0.3 },
           }),
           signal: controller.signal,
-        });
+          }
+        );
         clearTimeout(timeout);
 
         if (!res.ok) {
           aiError = res.status === 429 ? "AI_RATE_LIMITED" : "AI_REQUEST_FAILED";
         } else {
           const data = await res.json();
-          const toolUse = (data.content ?? []).find((b: { type: string }) => b.type === "tool_use");
-          if (!toolUse) {
+          const parts = data.candidates?.[0]?.content?.parts ?? [];
+          const functionCall = parts.find((part: { functionCall?: unknown }) => part.functionCall)?.functionCall;
+          if (!functionCall || functionCall.name !== ASSESSMENT_TOOL.name) {
             aiError = "AI_INVALID_RESPONSE";
           } else {
-            aiResult = validateAssessmentOutput(toolUse.input);
+            aiResult = validateAssessmentOutput(functionCall.args);
             if (!aiResult) aiError = "AI_INVALID_RESPONSE";
           }
         }
