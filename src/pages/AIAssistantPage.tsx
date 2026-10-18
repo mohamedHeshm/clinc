@@ -85,18 +85,16 @@ export default function AIAssistantPage() {
 
         if (res.is_emergency) setEmergency({ reasons: res.emergency_reasons, selfHarm: res.is_self_harm_related });
 
-        if (res.reply_text) {
-          setMessages((m) => [...m, { id: crypto.randomUUID(), role: "assistant", content: res.reply_text! }]);
-        } else if (res.ai_error) {
-          setMessages((m) => [
-            ...m,
-            {
-              id: crypto.randomUUID(),
-              role: "assistant",
-              content: "تعذّر الوصول للمساعد الذكي الآن. يمكنك البحث عن طبيب مباشرة من قائمة الأطباء.",
-            },
-          ]);
-        }
+    if (res.reply_text) {
+  setMessages((messages) => [
+    ...messages,
+    {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: res.reply_text!,
+    },
+  ]);
+}
       } catch (e) {
         const msg = e instanceof AssistantError ? e.message : "حدث خطأ غير متوقع، حاول مرة أخرى.";
         setError({ message: msg, retryText: clean });

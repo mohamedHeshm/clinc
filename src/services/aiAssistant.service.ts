@@ -1,3 +1,4 @@
+
 import { supabase } from "@/lib/supabase";
 import type {
   AssistantResponse,
@@ -67,9 +68,31 @@ const CONFIDENCE_ORDER: Record<ConfidenceLabel, number> = {
   low: 1,
 };
 
+function getInvokeStatus(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null) {
+    return undefined;
+  }
+
+  const context = (error as {
+    context?: { status?: unknown };
+  }).context;
+
+  return typeof context?.status === "number"
+    ? context.status
+    : undefined;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
+}
+
 /**
- * إرسال رسالة للمساعد من خلال Supabase Edge Function.
- * مفتاح الذكاء الاصطناعي لا يُستخدم في الواجهة الأمامية.
+ * إرسال رسالة للمساعد عبر Supabase Edge Function.
+ * لا يتم وضع مفتاح Gemini في الواجهة الأمامية.
  */
 export async function sendAssistantMessage(params: {
   sessionId: string | null;
@@ -84,53 +107,106 @@ export async function sendAssistantMessage(params: {
     );
   }
 
-  const { data, error } = await supabase.functions.invoke(
-    "ai-health-assistant",
-    {
-      body: {
-        sessionId: params.sessionId,
-        message,
-      },
-    }
-  );
+  let data: unknown;
+  let invokeError: unknown;
 
-  if (error) {
-    const status = (
-      error as { context?: { status?: number } }
-    ).context?.status;
+  try {
+    const result = await supabase.functions.invoke(
+      "ai-health-assistant",
+      {
+        body: {
+          sessionId: params.sessionId,
+          message,
+        },
+      }
+    );
+
+    data = result.data;
+    invokeError = result.error;
+  } catch (error) {
+    console.error("[AI_ASSISTANT_INVOKE_ERROR]", {
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unknown invocation error",
+    });
+
+    throw new AssistantError(
+      "UNAVAILABLE",
+      "تعذّر الاتصال بالمساعد الصحي. حاول مرة أخرى أو تصفّح الأطباء."
+    );
+  }
+
+  if (invokeError) {
+    const status = getInvokeStatus(invokeError);
+
+    console.error("[AI_ASSISTANT_INVOKE_ERROR]", {
+      status: status ?? null,
+      message:
+        invokeError instanceof Error
+          ? invokeError.message
+          : "Function invocation failed",
+    });
 
     if (status === 401) {
       throw new AssistantError(
         "UNAUTHENTICATED",
-        "برجاء تسجيل الدخول لاستخدام المساعد الصحي."
+        "برجاء تسجيل الدخول من جديد لاستخدام المساعد الصحي."
       );
     }
 
     if (status === 429) {
       throw new AssistantError(
         "RATE_LIMITED",
-        "استخدمت المساعد عدة مرات مؤخرًا، حاول لاحقًا."
+        "استخدمت المساعد عدة مرات مؤخرًا. حاول لاحقًا."
       );
     }
 
     throw new AssistantError(
       "UNAVAILABLE",
-      "المساعد الذكي غير متاح الآن. يمكنك البحث عن طبيب يدويًا."
+      "المساعد الصحي غير متاح حاليًا. يمكنك تصفّح الأطباء مباشرة."
     );
   }
 
-  if (!data || typeof data !== "object") {
+  if (!isObject(data)) {
     throw new AssistantError(
       "UNAVAILABLE",
       "لم تصل استجابة صحيحة من المساعد الصحي."
     );
   }
 
-  if ("error" in data && data.error) {
-    throw new AssistantError("UNKNOWN", String(data.error));
+  if (typeof data.error === "string" && data.error) {
+    throw new AssistantError("UNKNOWN", data.error);
   }
 
-  return data as AssistantResponse;
+  // أخطاء Gemini قد ترجع HTTP 200 مع ai_error.
+  // نمرر الاستجابة للواجهة حتى تتمكن من عرض fallback.
+  if (typeof data.ai_error === "string" && data.ai_error) {
+    console.warn("[AI_ASSISTANT_PROVIDER_ERROR]", {
+      code: data.ai_error,
+    });
+  }
+
+  const validResponse =
+    typeof data.sessionId === "string" &&
+    typeof data.stage === "string" &&
+    typeof data.is_emergency === "boolean" &&
+    Array.isArray(data.follow_up_questions) &&
+    Array.isArray(data.emergency_reasons) &&
+    Array.isArray(data.recommended_specialties);
+
+  if (!validResponse) {
+    console.error("[AI_ASSISTANT_INVALID_RESPONSE]", {
+      fields: Object.keys(data),
+    });
+
+    throw new AssistantError(
+      "UNAVAILABLE",
+      "استجابة المساعد غير مكتملة. حاول مرة أخرى لاحقًا."
+    );
+  }
+
+  return data as unknown as AssistantResponse;
 }
 
 function isoDate(date: Date): string {
@@ -142,17 +218,20 @@ function isoDate(date: Date): string {
 }
 
 /**
- * جلب أقرب مواعيد فعلية خلال الأيام السبعة القادمة.
- * تعذّر جلب المواعيد لا يمنع عرض الطبيب.
+ * جلب أقرب مواعيد متاحة خلال الأيام السبعة القادمة.
+ * فشل جلب المواعيد لا يمنع عرض الطبيب.
  */
 async function findNextSlots(
   doctorId: string
 ): Promise<{ date: string; slots: AvailableSlot[] } | null> {
   try {
-    const workingDays = await fetchProviderAvailability(doctorId, "doctor");
+    const workingDays = await fetchProviderAvailability(
+      doctorId,
+      "doctor"
+    );
 
     const workingDaySet = new Set(
-      workingDays.map((workingDay) => workingDay.day_of_week)
+      workingDays.map((day) => day.day_of_week)
     );
 
     if (workingDaySet.size === 0) {
@@ -166,9 +245,7 @@ async function findNextSlots(
       const date = new Date(today);
       date.setDate(today.getDate() + offset);
 
-      const day = date.getDay();
-
-      if (!workingDaySet.has(day)) {
+      if (!workingDaySet.has(date.getDay())) {
         continue;
       }
 
@@ -191,29 +268,40 @@ async function findNextSlots(
     }
 
     return null;
-  } catch {
-    // نستمر في عرض الطبيب حتى لو تعذر جلب المواعيد.
+  } catch (error) {
+    console.warn("[AI_ASSISTANT_SLOTS_ERROR]", {
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unknown slots error",
+    });
+
     return null;
   }
 }
 
 /**
- * يجلب الأطباء النشطين للتخصصات التي طابقت قاعدة البيانات.
- * ترتيب النتائج:
- * 1. وجود مواعيد متاحة.
- * 2. قوة تطابق التخصص.
- * 3. التقييم.
- * 4. السعر الأقل.
+ * جلب الأطباء حسب التخصصات المقترحة.
  */
 export async function findDoctorsForSpecialties(
   specialties: RecommendedSpecialty[]
 ): Promise<RecommendationResult> {
-  const availableSpecializations = (await fetchDoctorSpecializations()).map((name) => ({
+  if (specialties.length === 0) {
+    return {
+      matched: [],
+      unmatchedSpecialties: [],
+    };
+  }
+
+  const names = await fetchDoctorSpecializations();
+
+  const availableSpecializations = names.map((name) => ({
     id: name,
     name,
   }));
 
   const unmatchedSpecialties: string[] = [];
+
   const picks: {
     spec: { id: string; name: string };
     rec: RecommendedSpecialty;
@@ -225,14 +313,15 @@ export async function findDoctorsForSpecialties(
       availableSpecializations
     );
 
-    if (specialization) {
-      picks.push({
-        spec: specialization,
-        rec: recommendation,
-      });
-    } else {
+    if (!specialization) {
       unmatchedSpecialties.push(recommendation.name);
+      continue;
     }
+
+    picks.push({
+      spec: specialization,
+      rec: recommendation,
+    });
   }
 
   if (picks.length === 0) {
@@ -257,20 +346,42 @@ export async function findDoctorsForSpecialties(
       .limit(4);
 
     if (error) {
-      throw error;
+      console.error("[AI_ASSISTANT_DOCTOR_QUERY_ERROR]", {
+        code: error.code,
+        message: error.message,
+      });
+
+      throw new Error(
+        "تعذّر تحميل الأطباء من قاعدة البيانات."
+      );
     }
 
-    const doctors = ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
-      doctor_id: String(row.id ?? ""),
-      full_name: String(row.full_name ?? ""),
-      avatar_url: typeof row.avatar_url === "string" ? row.avatar_url : null,
-      specialization_name: typeof row.specialization === "string" ? row.specialization : null,
-      experience_years: Number(row.experience_years ?? 0),
-      reviews_count: Number(row.rating_count ?? 0),
-      average_rating: Number(row.rating_avg ?? 0),
-      consultation_price: Number(row.consultation_price ?? 0),
-      clinic_address: typeof row.clinic_address === "string" ? row.clinic_address : null,
-    })) as DoctorDirectoryEntry[];
+    const doctors: DoctorDirectoryEntry[] = (
+      (data ?? []) as Array<Record<string, unknown>>
+    )
+      .map((row) => ({
+        doctor_id: String(row.id ?? ""),
+        full_name: String(row.full_name ?? ""),
+        avatar_url:
+          typeof row.avatar_url === "string"
+            ? row.avatar_url
+            : null,
+        specialization_name:
+          typeof row.specialization === "string"
+            ? row.specialization
+            : null,
+        experience_years: Number(row.experience_years ?? 0),
+        reviews_count: Number(row.rating_count ?? 0),
+        average_rating: Number(row.rating_avg ?? 0),
+        consultation_price: Number(row.consultation_price ?? 0),
+        clinic_address:
+          typeof row.clinic_address === "string"
+            ? row.clinic_address
+            : null,
+      }))
+      .filter(
+        (doctor) => doctor.doctor_id && doctor.full_name
+      );
 
     const newDoctors = doctors.filter((doctor) => {
       if (seenDoctorIds.has(doctor.doctor_id)) {
@@ -282,13 +393,15 @@ export async function findDoctorsForSpecialties(
     });
 
     const recommendations = await Promise.all(
-      newDoctors.map(async (doctor): Promise<DoctorRecommendation> => ({
-        doctor,
-        specialtyName: spec.name,
-        confidence: rec.confidence_label,
-        reason: rec.reason,
-        nextSlots: await findNextSlots(doctor.doctor_id),
-      }))
+      newDoctors.map(
+        async (doctor): Promise<DoctorRecommendation> => ({
+          doctor,
+          specialtyName: spec.name,
+          confidence: rec.confidence_label,
+          reason: rec.reason,
+          nextSlots: await findNextSlots(doctor.doctor_id),
+        })
+      )
     );
 
     results.push(...recommendations);
@@ -311,18 +424,17 @@ export async function findDoctorsForSpecialties(
       return confidenceDifference;
     }
 
-    const ratingA = Number(a.doctor.average_rating ?? 0);
-    const ratingB = Number(b.doctor.average_rating ?? 0);
-    const ratingDifference = ratingB - ratingA;
+    const ratingDifference =
+      b.doctor.average_rating - a.doctor.average_rating;
 
     if (ratingDifference !== 0) {
       return ratingDifference;
     }
 
-    const priceA = Number(a.doctor.consultation_price ?? Infinity);
-    const priceB = Number(b.doctor.consultation_price ?? Infinity);
-
-    return priceA - priceB;
+    return (
+      a.doctor.consultation_price -
+      b.doctor.consultation_price
+    );
   });
 
   return {
